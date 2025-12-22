@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: livego_app
+    restart: always
+    ports:
+      - "80:80"
+    networks:
+      - livego_network
+
+networks:
+  livego_network:
+    driver: bridge

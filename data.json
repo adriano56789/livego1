@@ -1,0 +1,172 @@
+{
+  "currentUser": {
+    "id": "me",
+    "identification": "12345678",
+    "name": "Você",
+    "avatarUrl": "https://picsum.photos/seed/me/200",
+    "coverUrl": "https://picsum.photos/seed/cover/800/600",
+    "diamonds": 5000,
+    "level": 12,
+    "xp": 1500,
+    "isLive": false,
+    "earnings": 1500,
+    "earnings_withdrawn": 0,
+    "following": 45,
+    "fans": 120,
+    "gender": "male",
+    "age": 25,
+    "location": "Brasil",
+    "isOnline": true,
+    "bio": "Novo na plataforma LiveGo!",
+    "obras": [],
+    "curtidas": [],
+    "ownedFrames": []
+  },
+  "users": [
+    {
+      "id": "11223344",
+      "name": "Juma",
+      "identification": "11223344",
+      "avatarUrl": "https://picsum.photos/seed/juma/100",
+      "coverUrl": "https://picsum.photos/seed/cover1/800/600",
+      "diamonds": 100,
+      "level": 12,
+      "xp": 0,
+      "isLive": true,
+      "fans": 500,
+      "following": 20,
+      "gender": "female",
+      "age": 22,
+      "location": "Brasil",
+      "isOnline": true,
+      "bio": "Amo natureza e lives!",
+      "earnings": 0,
+      "earnings_withdrawn": 0
+    },
+    {
+      "id": "55667788",
+      "name": "Ana",
+      "identification": "55667788",
+      "avatarUrl": "https://picsum.photos/seed/ana/100",
+      "coverUrl": "https://picsum.photos/seed/cover2/800/600",
+      "diamonds": 50,
+      "level": 5,
+      "xp": 0,
+      "isLive": false,
+      "fans": 1200,
+      "following": 100,
+      "gender": "female",
+      "age": 24,
+      "location": "Brasil",
+      "isOnline": false,
+      "bio": "Cantora e compositora.",
+      "earnings": 0,
+      "earnings_withdrawn": 0
+    },
+    {
+      "id": "99887766",
+      "name": "Carlos",
+      "identification": "99887766",
+      "avatarUrl": "https://picsum.photos/seed/carlos/100",
+      "coverUrl": "https://picsum.photos/seed/cover3/800/600",
+      "diamonds": 2000,
+      "level": 8,
+      "xp": 0,
+      "isLive": false,
+      "fans": 30,
+      "following": 150,
+      "gender": "male",
+      "age": 28,
+      "location": "Brasil",
+      "isOnline": true,
+      "bio": "Gamer hardcore.",
+      "earnings": 0,
+      "earnings_withdrawn": 0
+    },
+    {
+      "id": "support-livercore",
+      "name": "Livercore",
+      "identification": "00000001",
+      "avatarUrl": "https://picsum.photos/seed/livercore/100",
+      "coverUrl": "",
+      "diamonds": 999999,
+      "level": 99,
+      "xp": 0,
+      "isLive": false,
+      "fans": 9999,
+      "following": 0,
+      "gender": "not_specified",
+      "age": 0,
+      "location": "Global",
+      "isOnline": true,
+      "bio": "Suporte Oficial",
+      "earnings": 0,
+      "earnings_withdrawn": 0
+    }
+  ],
+  "streamers": [
+    {
+      "id": "stream-1",
+      "hostId": "11223344",
+      "name": "Juma Live",
+      "avatar": "https://picsum.photos/seed/juma/100",
+      "thumbnail": "https://picsum.photos/seed/juma/400/600",
+      "location": "Amazonas",
+      "viewers": 1540,
+      "description": "Conversando com a galera",
+      "quality": "720p",
+      "isPrivate": false,
+      "category": "Popular"
+    },
+    {
+      "id": "stream-2",
+      "hostId": "9821001",
+      "name": "Festa DJ",
+      "avatar": "https://picsum.photos/seed/dj/100",
+      "thumbnail": "https://picsum.photos/seed/dj/400/600",
+      "location": "São Paulo",
+      "viewers": 3200,
+      "description": "Música eletrônica non-stop",
+      "quality": "1080p",
+      "isPrivate": false,
+      "category": "Música"
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg-1",
+      "fromUserId": "support-livercore",
+      "toUserId": "me",
+      "text": "Bem-vindo à plataforma LiveGo! Divirta-se.",
+      "timestamp": 1678880000000
+    },
+    {
+      "id": "msg-2",
+      "fromUserId": "11223344",
+      "toUserId": "me",
+      "text": "Obrigado por seguir!",
+      "timestamp": 1678890000000
+    }
+  ],
+  "gifts": [
+    { "id": "1", "name": "Coração", "price": 1, "icon": "❤️", "category": "Popular" },
+    { "id": "2", "name": "Café", "price": 3, "icon": "☕", "category": "Popular" },
+    { "id": "9", "name": "Sinal de Luz do Ventilador", "price": 10, "icon": "🌟", "category": "Popular", "triggersAutoFollow": true },
+    { "id": "20", "name": "Urso", "price": 500, "icon": "🧸", "category": "Luxo" },
+    { "id": "60", "name": "Foguete", "price": 500, "icon": "🚀", "category": "VIP" },
+    { "id": "64", "name": "Carro", "price": 1000, "icon": "🚗", "category": "VIP" }
+  ],
+  "wallet": {
+    "me": {
+      "userId": "me",
+      "balance": 100.50,
+      "currency": "BRL",
+      "diamonds": 5000,
+      "beans": 1500
+    }
+  },
+  "relationships": {
+    "following": ["11223344", "support-livercore"],
+    "fans": ["55667788"]
+  }
+}
