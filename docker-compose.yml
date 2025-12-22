@@ -5,13 +5,27 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: livego_app
+    container_name: livego_frontend
     restart: always
     ports:
       - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - livego_network
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: livego_backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
     networks:
       - livego_network
 
 networks:
   livego_network:
-    driver: bridge
