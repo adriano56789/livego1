@@ -1,16 +1,15 @@
-import mongoose from 'mongoose';
-
+ import mongoose from 'mongoose';
 export const connectDB = async () => {
     const uri = process.env.MONGODB_URI || 'mongodb://72.60.249.175:27017/livego?authSource=admin';
     try {
         await mongoose.connect(uri);
         console.log("✅ MongoDB Conectado");
         await seedGifts();
-    } catch (err) {
+    }
+    catch (err) {
         console.error("❌ Erro MongoDB:", err);
     }
 };
-
 const seedGifts = async () => {
     try {
         const count = await GiftModel.countDocuments();
@@ -26,11 +25,11 @@ const seedGifts = async () => {
             await GiftModel.insertMany(defaultGifts);
             console.log("🎁 Presentes iniciais criados!");
         }
-    } catch (e) {
+    }
+    catch (e) {
         console.error("Erro ao semear presentes:", e);
     }
 };
-
 const UserSchema = new mongoose.Schema({
     id: { type: String, unique: true, required: true },
     identification: { type: String },
@@ -54,9 +53,9 @@ const UserSchema = new mongoose.Schema({
     activeFrameId: { type: String },
     frameExpiration: { type: Date },
     ownedFrames: [{
-        frameId: String,
-        expirationDate: Date
-    }],
+            frameId: String,
+            expirationDate: Date
+        }],
     isLive: { type: Boolean, default: false },
     liveTitle: { type: String },
     liveCategory: { type: String },
@@ -127,7 +126,6 @@ const UserSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
-
 // Add indexes for better query performance
 UserSchema.index({ id: 1 });
 UserSchema.index({ isOnline: 1 });
@@ -135,7 +133,6 @@ UserSchema.index({ isLive: 1 });
 UserSchema.index({ 'fanClub.streamerId': 1 });
 UserSchema.index({ 'followingIds': 1 });
 UserSchema.index({ 'followers': 1 });
-
 const GiftSchema = new mongoose.Schema({
     id: String,
     name: { type: String, unique: true },
@@ -143,13 +140,11 @@ const GiftSchema = new mongoose.Schema({
     icon: String,
     category: String
 });
-
 const StreamerSchema = new mongoose.Schema({
     id: { type: String, unique: true },
     hostId: String,
     active: { type: Boolean, default: true }
 });
-
 const TransactionSchema = new mongoose.Schema({
     userId: String,
     receiverId: String,
@@ -158,7 +153,6 @@ const TransactionSchema = new mongoose.Schema({
     giftName: String,
     timestamp: { type: Date, default: Date.now }
 });
-
 const ReportSchema = new mongoose.Schema({
     reporterId: { type: String, required: true },
     targetId: { type: String, required: true },
@@ -168,19 +162,11 @@ const ReportSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
-
-// Add interface for User document
-export interface IUser extends mongoose.Document {
-    [key: string]: any; // For dynamic access to any property
-    // Add all the fields from the schema here for better type checking
-}
-
-export const UserModel = mongoose.model<IUser>('User', UserSchema);
+export const UserModel = mongoose.model('User', UserSchema);
 export const GiftModel = mongoose.model('Gift', GiftSchema);
 export const StreamerModel = mongoose.model('Streamer', StreamerSchema);
 export const TransactionModel = mongoose.model('Transaction', TransactionSchema);
 export const ReportModel = mongoose.model('Report', ReportSchema);
-
 // Add Message model
 const MessageSchema = new mongoose.Schema({
     chatId: { type: String },
@@ -197,5 +183,4 @@ const MessageSchema = new mongoose.Schema({
     username: { type: String },
     badgeLevel: { type: Number }
 });
-
 export const MessageModel = mongoose.model('Message', MessageSchema);

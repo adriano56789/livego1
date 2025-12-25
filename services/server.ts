@@ -1,312 +1,231 @@
-
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
-import mongoose from 'mongoose';
-import { 
-    connectDB, 
-    UserModel, 
-    StreamerModel, 
-    GiftModel, 
-    TransactionModel, 
-} from './database';
-// Fix: Import CURRENT_USER_ID from db_shared as it is not exported from database.ts
-import { CURRENT_USER_ID } from './db_shared';
-import { dbConfig } from './config';
+import { connectDB, UserModel, GiftModel, TransactionModel, StreamerModel } from './database.js';
 
-// Declare globals for Node
-declare var require: any;
-declare var module: any;
-
-// Inicialização do App Express
 const app = express();
+const PORT = Number(process.env.PORT) || 3000;
 
-// Fix: Use 'as any' for app to bypass typing issues with middleware calls like use() when they expect 0 arguments
 const anyApp = app as any;
-anyApp.use(cors());
+anyApp.use(cors({ origin: '*', credentials: true }));
 anyApp.use(express.json());
 
-// Middleware para garantir conexão
-app.use(async (req: Request, res: Response, next: NextFunction) => {
-    if (mongoose.connection.readyState !== 1) {
-        return (res as any).status(503).json({ error: 'Database not connected' });
-    }
-    next();
-});
+connectDB();
 
-// Helper de Nível
-const getLevelFromXP = (xp: number) => {
-    // Lógica simples: Nível = 1 + XP / 1000
-    return Math.floor(1 + xp / 1000);
-};
+// Helper para nível: 1000 XP por nível
+const calculateLevel = (xp: number) => Math.floor(1 + (xp / 1000));
 
-// --- Rotas Reais ---
+// --- ROTAS DE USUÁRIO ---
 
-// 1. Get Current User (Simulado 'me' ou pegar do header em auth real)
-app.get('/api/users/me', async (req, res) => {
+app.get('/api/users/me', async (req: Request, res: Response) => {
     try {
-        let user = await UserModel.findOne({ id: CURRENT_USER_ID });
-        
+        let user = await UserModel.findOne({ id: 'me' });
         if (!user) {
             user = await UserModel.create({
-                id: CURRENT_USER_ID,
-                name: 'Você',
-                username: 'voce_real',
-                avatarUrl: 'https://picsum.photos/seed/me/200',
-                coverUrl: 'https://picsum.photos/seed/cover/800/600',
-                diamonds: 5000,
-                level: 12,
-                earnings: 0
+                id: 'me',
+                name: 'Admin User',
+                avatarUrl: 'https://picsum.photos/seed/admin/200',
+                diamonds: 10000,
+                isVIP: true
             });
         }
-        res.json({ data: user });
-    } catch (e: any) {
-        (res as any).status(500).json({ error: e.message });
+        (res as any).json({ data: user });
+    } catch (error: any) {
+        (res as any).status(500).json({ error: error.message });
     }
 });
 
-// 2. Get All Users
-app.get('/api/users', async (req, res) => {
+// Busca a galeria de presentes recebidos pelo streamer
+app.get('/api/users/:id/gifts/received', async (req: Request, res: Response) => {
     try {
-        const users = await UserModel.find();
-        res.json({ data: users });
-    } catch (e: any) {
-        (res as any).status(500).json({ error: e.message });
+        const { id } = (req as any).params;
+        const transactions = await TransactionModel.aggregate([
+            { $match: { receiverId: id, type: 'gift', status: 'Concluído' } },
+            { $group: { _id: "$giftName", count: { $sum: "$quantity" } } }
+        ]);
+
+        const allGifts = await GiftModel.find();
+        const data = transactions.map(t => {
+            const giftInfo = allGifts.find(g => g.name === t._id);
+            return {
+                id: giftInfo?.id || t._id,
+                name: t._id,
+                count: t.count,
+                icon: giftInfo?.icon || '🎁',
+                category: giftInfo?.category || 'Popular'
+            };
+        });
+
+        (res as any).json({ data });
+    } catch (error: any) {
+        (res as any).status(500).json({ error: error.message });
     }
 });
 
-// 3. Get User by ID
-app.get('/api/users/:id', async (req, res) => {
+// --- CARTEIRA E SAQUE ---
+
+app.get('/api/wallet', async (req: Request, res: Response) => {
     try {
-        const user = await UserModel.findOne({ id: req.params.id });
+        const user = await UserModel.findOne({ id: 'me' });
         if (!user) return (res as any).status(404).json({ error: 'User not found' });
-        res.json({ data: user });
-    } catch (e: any) {
-        (res as any).status(500).json({ error: e.message });
-    }
-});
 
-// 4. Update Profile
-app.patch('/api/users/:id', async (req, res) => {
-    try {
-        const user = await UserModel.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
-        res.json({ data: { success: true, user } });
-    } catch (e: any) {
-        (res as any).status(500).json({ error: e.message });
-    }
-});
-
-// 5. Gifts
-app.get('/api/gifts', async (req, res) => {
-    try {
-        let gifts = await GiftModel.find();
-        // Se vazio, popula com defaults (apenas uma vez)
-        if (gifts.length === 0) {
-            const defaultGifts = [
-                { id: '1', name: 'Coração', price: 1, icon: '❤️', category: 'Popular' },
-                { id: '2', name: 'Café', price: 3, icon: '☕', category: 'Popular' },
-                { id: '9', name: 'Sinal de Luz do Ventilador', price: 10, icon: '🌟', category: 'Popular', triggersAutoFollow: true },
-                { id: '60', name: 'Foguete', price: 500, icon: '🚀', category: 'VIP' }
-            ];
-            gifts = await GiftModel.insertMany(defaultGifts) as any;
-        }
-        res.json({ data: gifts });
-    } catch (e: any) {
-        (res as any).status(500).json({ error: e.message });
-    }
-});
-
-// 6. Send Gift (Lógica completa)
-app.post('/api/gifts/send', async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
-        const { fromUserId, streamId, giftName, amount } = req.body;
-        
-        const gift = await GiftModel.findOne({ name: giftName });
-        if (!gift) throw new Error('Gift not found');
-
-        const sender = await UserModel.findOne({ id: fromUserId }).session(session);
-        if (!sender) throw new Error('Sender not found');
-
-        const totalCost = gift.price * amount;
-        if (sender.diamonds < totalCost) throw new Error('Insufficient diamonds');
-
-        // 1. Deduct from Sender
-        sender.diamonds -= totalCost;
-        sender.xp = (sender.xp || 0) + totalCost;
-        sender.level = getLevelFromXP(sender.xp);
-        
-        // 2. Add to Receiver (Streamer)
-        const stream = await StreamerModel.findOne({ id: streamId }).session(session);
-        let updatedReceiver = null;
-        
-        if (stream) {
-            const receiver = await UserModel.findOne({ id: stream.hostId }).session(session);
-            if (receiver) {
-                // Earnings logic
-                receiver.earnings += totalCost;
-                receiver.xp = (receiver.xp || 0) + totalCost;
-                receiver.level = getLevelFromXP(receiver.xp);
-                
-                // Fan Club Logic
-                if (gift.name === 'Sinal de Luz do Ventilador') {
-                    // Se não tiver fã clube, cria (simulado na estrutura do usuário)
-                    // No MongoDB real, teríamos uma collection FanClubMembers
-                    // Aqui, simulamos setando no sender
-                    // Em um app real, verificaríamos se já é fã
-                }
-
-                // Auto Follow Logic
-                if (gift.triggersAutoFollow) {
-                    // Aqui entraria a lógica de follow (adicionar na lista de followers do receiver e following do sender)
-                    receiver.fans = (receiver.fans || 0) + 1;
-                    sender.following = (sender.following || 0) + 1;
-                }
-
-                await receiver.save({ session });
-                updatedReceiver = receiver;
-            }
-        }
-
-        await sender.save({ session });
-
-        // 3. Record Transaction
-        await TransactionModel.create([{
-            id: `tx-${Date.now()}`,
-            userId: sender.id,
-            type: 'gift_sent',
-            amountCoins: totalCost,
-            description: `Sent ${amount}x ${gift.name}`,
-            status: 'Concluído',
-            relatedUserId: updatedReceiver ? updatedReceiver.id : undefined
-        }], { session });
-
-        await session.commitTransaction();
-        res.json({ data: { success: true, updatedSender: sender, updatedReceiver } });
-
-    } catch (e: any) {
-        await session.abortTransaction();
-        (res as any).status(400).json({ error: e.message });
-    } finally {
-        session.endSession();
-    }
-});
-
-// 7. Wallet Data
-app.get('/api/wallet', async (req, res) => {
-    try {
-        const user = await UserModel.findOne({ id: CURRENT_USER_ID });
-        if (!user) throw new Error('User not found');
-        
-        // Simples lógica de conversão
+        // Beans -> BRL: 800 diamantes = 7 reais
         const rate = 7.00 / 800;
         const gross = user.earnings * rate;
-        const fee = gross * 0.20;
-        const net = gross * 0.80;
+        const fee = gross * 0.20; // 20% taxa
+        const net = gross * 0.80; // 80% streamer
 
-        res.json({ 
+        (res as any).json({ 
             data: {
-                userId: user.id,
-                balance: user.earnings,
-                currency: 'BRL',
                 diamonds: user.diamonds,
+                earnings: user.earnings,
                 userEarnings: {
                     available_diamonds: user.earnings,
-                    gross_brl: parseFloat(gross.toFixed(2)),
-                    platform_fee_brl: parseFloat(fee.toFixed(2)),
-                    net_brl: parseFloat(net.toFixed(2))
+                    gross_brl: gross,
+                    platform_fee_brl: fee,
+                    net_brl: net
                 }
             } 
         });
-    } catch (e: any) {
-        (res as any).status(500).json({ error: e.message });
+    } catch (error: any) {
+        (res as any).status(500).json({ error: error.message });
     }
 });
 
-// 8. Streams
-app.get('/api/streams', async (req, res) => {
+app.post('/api/wallet/withdraw', async (req: Request, res: Response) => {
+    const { amount, method } = (req as any).body;
     try {
-        const streams = await StreamerModel.find({ active: true });
-        res.json({ data: streams });
-    } catch (e: any) {
-        (res as any).status(500).json({ error: e.message });
-    }
-});
-
-app.post('/api/streams', async (req, res) => {
-    try {
-        const newStream = await StreamerModel.create({
-            id: `stream-${Date.now()}`,
-            ...req.body,
-            viewers: 0,
-            active: true
-        });
-        
-        // Atualiza status do usuário
-        await UserModel.findOneAndUpdate({ id: req.body.hostId }, { isLive: true });
-        
-        res.json({ data: newStream });
-    } catch (e: any) {
-        (res as any).status(500).json({ error: e.message });
-    }
-});
-
-// 9. Withdraw
-app.post('/api/wallet/withdraw', async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
-        const { amount } = req.body;
-        const user = await UserModel.findOne({ id: CURRENT_USER_ID }).session(session);
-        
-        if (!user) throw new Error('User not found');
-        if (user.earnings < amount) throw new Error('Insufficient earnings');
-
-        user.earnings -= amount;
-        user.earnings_withdrawn += amount;
-        await user.save({ session });
+        const user = await UserModel.findOne({ id: 'me' });
+        if (!user || user.earnings < amount) {
+            return (res as any).status(400).json({ error: 'Saldo insuficiente' });
+        }
 
         const rate = 7.00 / 800;
-        const gross = amount * rate;
-        const net = gross * 0.80;
+        const grossValue = amount * rate;
+        const netValue = grossValue * 0.80;
+        const platformFee = grossValue * 0.20;
 
-        const record = await TransactionModel.create([{
-            id: `withdraw-${Date.now()}`,
-            userId: user.id,
-            type: 'withdraw',
-            amountCoins: amount,
-            amountBRL: parseFloat(net.toFixed(2)),
+        // Deduz saldo de ganhos e registra retirada
+        user.earnings -= amount;
+        user.earnings_withdrawn += amount;
+        // Atribui a taxa para o balanço do admin (me) para fins de simulação
+        user.platformEarnings += platformFee;
+        await user.save();
+
+        const record = await TransactionModel.create({
+            id: `wd-${Date.now()}`,
+            userId: 'me',
+            type: 'withdrawal',
             status: 'Pendente',
-            description: 'Saque de Ganhos'
-        }], { session });
+            amountCoins: amount,
+            amountBRL: netValue,
+            description: `Saque PIX para ${method?.details?.key || 'chave padrão'}`,
+            timestamp: new Date()
+        });
 
-        await session.commitTransaction();
-        res.json({ data: { success: true, message: 'Withdrawal requested', record: record[0] } });
-    } catch (e: any) {
-        await session.abortTransaction();
-        (res as any).status(400).json({ error: e.message });
-    } finally {
-        session.endSession();
+        (res as any).json({ data: { success: true, record, message: 'Saque solicitado. Aguarde 24h.' } });
+    } catch (error: any) {
+        (res as any).status(500).json({ error: error.message });
     }
 });
 
-// --- Inicialização do Servidor ---
+// --- SISTEMA DE PRESENTES ---
 
-const startServer = async () => {
-    await connectDB();
-    // Fix: Ensure port is a number
-    const port = typeof dbConfig.server.port === 'string' ? parseInt(dbConfig.server.port, 10) : dbConfig.server.port;
-    // Fix: Cast app to any before calling listen to accept multi-parameter calls in restricted environments
-    (app as any).listen(port, '0.0.0.0', () => {
-        console.log(`🚀 Server running strictly on MongoDB at http://0.0.0.0:${port}`);
-    });
-};
+app.post('/api/gifts/send', async (req: Request, res: Response) => {
+    const { fromUserId, streamId, giftName, amount } = (req as any).body;
+    try {
+        const sender = await UserModel.findOne({ id: fromUserId });
+        const gift = await GiftModel.findOne({ name: giftName });
+        const stream = await StreamerModel.findOne({ id: streamId });
 
-// Inicia se for executado diretamente
-if (require.main === module) {
-    startServer();
-}
+        if (!sender || !gift) {
+            return (res as any).status(404).json({ error: 'Dados inválidos' });
+        }
 
-export const mockApiRouter = async (method: string, path: string, body?: any) => {
-    throw new Error("mockApiRouter is disabled. Use real HTTP calls.");
-};
+        const quantity = amount || 1;
+        const giftPrice = gift?.price ?? 0; // Handle null/undefined with optional chaining and nullish coalescing
+        const totalCost = giftPrice * quantity;
+
+        if (sender.diamonds < totalCost) {
+            return (res as any).status(400).json({ error: 'Diamantes insuficientes' });
+        }
+
+        // 1. Atualiza Doador (Debita saldo e adiciona XP)
+        sender.diamonds -= totalCost;
+        sender.xp += totalCost;
+        sender.level = calculateLevel(sender.xp);
+        await sender.save();
+
+        // 2. Atualiza Recebedor (Credita saldo de ganhos)
+        const receiverId = stream?.hostId || 'unknown';
+        if (receiverId !== 'unknown') {
+            const receiver = await UserModel.findOne({ id: receiverId });
+            if (receiver) {
+                receiver.earnings += totalCost;
+                await receiver.save();
+            }
+        }
+
+        // 3. Registra a Transação
+        await TransactionModel.create({
+            id: `gt-${Date.now()}-${sender.id}`,
+            userId: fromUserId,
+            receiverId: receiverId,
+            streamId: streamId,
+            type: 'gift',
+            status: 'Concluído',
+            amountCoins: totalCost,
+            quantity: quantity,
+            giftName: gift.name,
+            timestamp: new Date()
+        });
+
+        (res as any).json({ 
+            data: { 
+                success: true, 
+                updatedSender: sender,
+                cost: totalCost 
+            } 
+        });
+    } catch (error: any) {
+        (res as any).status(500).json({ error: error.message });
+    }
+});
+
+// --- RANKING POR PERÍODO ---
+
+app.get('/api/rankings/:period', async (req: Request, res: Response) => {
+    const { period } = (req as any).params;
+    let startDate = new Date();
+
+    if (period === 'daily' || period === 'Diária') startDate.setHours(0,0,0,0);
+    else if (period === 'weekly' || period === 'Semanal') startDate.setDate(startDate.getDate() - 7);
+    else if (period === 'monthly' || period === 'Mensal') startDate.setMonth(startDate.getMonth() - 1);
+    else startDate.setHours(startDate.getHours() - 6); // Live (6h)
+
+    try {
+        const stats = await TransactionModel.aggregate([
+            { $match: { timestamp: { $gte: startDate }, type: 'gift', status: 'Concluído' } },
+            { $group: { _id: "$userId", total: { $sum: "$amountCoins" } } },
+            { $sort: { total: -1 } },
+            { $limit: 20 }
+        ]);
+
+        const rankedUsers = await Promise.all(stats.map(async (item) => {
+            const u = await UserModel.findOne({ id: item._id });
+            return {
+                id: u?.id || item._id,
+                name: u?.name || 'Usuário',
+                avatarUrl: u?.avatarUrl || 'https://picsum.photos/seed/u/100',
+                value: item.total,
+                level: u?.level || 1
+            };
+        }));
+        (res as any).json({ data: rankedUsers.filter(u => u.id) });
+    } catch (error: any) {
+        (res as any).status(500).json({ error: error.message });
+    }
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 API LiveGo Ativa em http://0.0.0.0:${PORT}`);
+});

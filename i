@@ -1,11 +1,14 @@
-VITE_API_URL=http://72.60.249.175:3000/api
-VITE_WS_URL=ws://72.60.249.175:3000
+### Frontend (`.env`)
+VITE_API_URL=/api
+VITE_WS_URL=wss://livego.store
 VITE_USE_MOCK=false
 VITE_APP_NAME=LiveGo
 VITE_APP_ENV=production
 VITE_FEATURE_CHAT=true
 VITE_FEATURE_LIVE_STREAMING=true
 VITE_FEATURE_PAYMENTS=true
+```
+
 
 # MongoDB Configuration
 MONGODB_URI="mongodb://72.60.249.175:27017/livego?authSource=admin"

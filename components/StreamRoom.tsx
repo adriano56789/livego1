@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import OnlineUsersModal from './live/OnlineUsersModal';
 import ChatMessage from './live/ChatMessage';
@@ -129,7 +128,7 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
         identification: streamer.hostId,
         name: streamer.name,
         avatarUrl: streamer.avatar,
-        coverUrl: `https://picsum.photos/seed/${streamer.id}/800/1600`,
+        coverUrl: `https://picsum.photos/seed/${streamer.id}/1000/1000`,
         country: 'br',
         age: 23,
         gender: 'female',
@@ -199,8 +198,6 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
     };
     
     useEffect(() => {
-        api.joinStream(streamer.id);
-
         const isFan = currentUser.fanClub && currentUser.fanClub.streamerId === streamer.hostId;
         const entryType = isFan ? 'fan_entry' : 'entry';
         const currentUserEntryMessage: ChatMessageType = {
@@ -210,22 +207,6 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
         };
         setMessages([currentUserEntryMessage]);
 
-        const loadHistory = async () => {
-            try {
-                const history = await api.getStreamMessages(streamer.id);
-                if (history && history.length > 0) {
-                    setMessages(prev => {
-                        const historyIds = new Set(history.map(h => h.id));
-                        const prevFiltered = prev.filter(p => !historyIds.has(p.id));
-                        return [...history, ...prevFiltered].sort((a, b) => a.id - b.id);
-                    });
-                }
-            } catch (e) {
-                console.error("Failed to load stream history", e);
-            }
-        };
-        loadHistory();
-
         api.getOnlineUsers(streamer.id).then(users => {
             if (users) {
                 const usersWithValue = users.map(u => ({ ...u, value: u.value || 0 }));
@@ -234,10 +215,6 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
                 previousOnlineUsersRef.current = usersWithValue;
             }
         });
-
-        return () => {
-            api.leaveStream(streamer.id);
-        }
     }, [streamer.id, streamer.hostId, currentUser, updateLiveSession]);
 
     const postGiftChatMessage = (payload: GiftPayload) => {
@@ -297,7 +274,7 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
                         console.error("Failed to translate message:", error);
                         setMessages(prev => [...prev, message]);
                     }
-                } else if (message.user !== currentUser.name) {
+                } else {
                      setMessages(prev => [...prev, message]);
                 }
             }
@@ -305,45 +282,17 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
         webSocketManager.on('newStreamMessage', handleNewMessage);
 
         const handleNewGift = (payload: GiftPayload) => {
-            if (payload.roomId !== streamer.id) {
+            if (payload.roomId !== streamer.id || payload.fromUser.id === currentUser.id) {
                 return;
             }
-            
-            if (payload.toUser.id === streamer.hostId) {
-                 const totalValue = (payload.gift.price || 0) * payload.quantity;
-                 if (liveSession) {
-                    updateLiveSession({ coins: (liveSession.coins || 0) + totalValue });
-                 }
-                 if (isBroadcaster) {
-                     updateUser({ ...currentUser, earnings: (currentUser.earnings || 0) + totalValue });
-                 }
+
+            if (liveSession) {
+                updateLiveSession({ coins: (liveSession.coins || 0) + (payload.gift.price || 0) * payload.quantity });
             }
             
             refreshStreamRoomData(streamer.hostId);
-            
-            if (payload.fromUser.id !== currentUser.id) {
-                postGiftChatMessage(payload);
-                setFullscreenGiftQueue(prev => [...prev, payload]);
-            }
-
-            setOnlineUsers(prev => {
-                const totalValue = (payload.gift.price || 0) * payload.quantity;
-                const existingUserIndex = prev.findIndex(u => u.id === payload.fromUser.id);
-                let newList = [...prev];
-                
-                if (existingUserIndex >= 0) {
-                    newList[existingUserIndex] = {
-                        ...newList[existingUserIndex],
-                        value: (newList[existingUserIndex].value || 0) + totalValue
-                    };
-                } else {
-                    newList.push({
-                        ...payload.fromUser,
-                        value: totalValue
-                    });
-                }
-                return newList.sort((a, b) => (b.value || 0) - (a.value || 0));
-            });
+            postGiftChatMessage(payload);
+            setFullscreenGiftQueue(prev => [...prev, payload]);
         };
         webSocketManager.on('newStreamGift', handleNewGift);
 
@@ -431,7 +380,7 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
                 usersUpdateTimeout.current = null;
             }
         };
-    }, [streamer.id, streamer.hostId, updateLiveSession, currentUser, language, t, onOpenFriendRequests, liveSession, refreshStreamRoomData, isBroadcaster, updateUser]);
+    }, [streamer.id, streamer.hostId, updateLiveSession, currentUser, language, t, onOpenFriendRequests, liveSession, refreshStreamRoomData]);
 
     const handleSendMessage = (e: React.MouseEvent | React.KeyboardEvent) => {
         e.stopPropagation();
@@ -513,7 +462,7 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
             identification: `user-${user.id}`, 
             name: user.user!, 
             avatarUrl: user.avatar!, 
-            coverUrl: `https://picsum.photos/seed/${user.id}/1000/1000`, 
+            coverUrl: `https://picsum.photos/seed/${user.id}/800/1200`, 
             country: 'br', 
             gender: user.gender || 'not_specified', 
             level: user.level || 1, 
@@ -561,31 +510,15 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
             roomId: streamer.id
         };
         
+        // Optimistic UI updates
         postGiftChatMessage(giftPayload);
         setFullscreenGiftQueue(prev => [...prev, giftPayload]);
         
         if (liveSession) {
-            updateLiveSession({ coins: (liveSession.coins || 0) + totalCost });
+            const coinsAdded = (gift.price || 0) * quantity;
+            updateLiveSession({ coins: (liveSession.coins || 0) + coinsAdded });
         }
 
-        setOnlineUsers(prev => {
-            const existingUserIndex = prev.findIndex(u => u.id === currentUser.id);
-            let newList = [...prev];
-            
-            if (existingUserIndex >= 0) {
-                newList[existingUserIndex] = {
-                    ...newList[existingUserIndex],
-                    value: (newList[existingUserIndex].value || 0) + totalCost
-                };
-            } else {
-                newList.push({
-                    ...currentUser,
-                    value: totalCost
-                });
-            }
-            return newList.sort((a, b) => (b.value || 0) - (a.value || 0));
-        });
-    
         try {
             const { success, error, updatedSender } = await api.sendGift(currentUser.id, streamer.id, gift.name, quantity);
     
@@ -608,7 +541,7 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
 
                 return updatedSender;
             } else {
-                throw new Error(error || "Falha ao enviar o presente.");
+                throw new Error(error || "Failed to send gift on server");
             }
         } catch (error) {
             console.error("Failed to send gift to server:", error);
@@ -632,7 +565,6 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
         api.kickUser(streamer.id, user.id, currentUser.id);
         addToast(ToastType.Info, `Usuário ${user.name} foi expulso.`);
     };
-
     const handleMakeModerator = (user: User) => {
         api.makeModerator(streamer.id, user.id, currentUser.id);
         addToast(ToastType.Success, `${user.name} agora é um moderador.`);
@@ -698,7 +630,7 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
 
     const handleMentionSelect = (username: string) => {
         const words = chatInput.split(' ');
-        words.pop(); 
+        words.pop();
         words.push(`@${username} `);
         const newChatInput = words.join(' ');
         
@@ -764,7 +696,9 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
                                         <div className="flex items-center space-x-1 text-gray-300 text-xs">
                                             <ViewerIcon className="w-4 h-4" />
                                             <span>{(liveSession?.viewers ?? 0).toLocaleString()}</span>
-                                            <HeartIcon className="w-3 h-3 text-white ml-1.5" fill="currentColor" />
+                                            {isJuFeFanClub && (
+                                                <HeartIcon className="w-3 h-3 text-white ml-1.5" fill="currentColor" />
+                                            )}
                                         </div>
                                     </div>
                                 </button>
@@ -881,8 +815,8 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
                             <div className="typing-bubble inline-block">{chatInput}</div>
                         </div>
                     )}
-                    <div className="flex items-center gap-2">
-                        <div className="flex-grow bg-black/40 backdrop-blur-md rounded-full flex items-center px-1 border border-white/5 focus-within:border-white/20 transition-all h-10">
+                    <div className="flex items-center space-x-2">
+                        <div className="flex-grow bg-black/40 rounded-full flex items-center pr-1.5 h-12">
                             <input 
                                 ref={chatInputRef}
                                 type="text" 
@@ -892,35 +826,15 @@ const StreamRoom: React.FC<StreamRoomProps> = ({ streamer, onRequestEndStream, o
                                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(e)}
                                 onFocus={() => setIsChatInputFocused(true)}
                                 onBlur={() => setTimeout(() => setIsChatInputFocused(false), 200)}
-                                className="flex-grow bg-transparent px-4 py-2 text-white placeholder-white/50 focus:outline-none text-[15px]" 
+                                className="flex-grow bg-transparent px-4 py-2.5 text-white placeholder-gray-400 focus:outline-none text-sm" 
                             />
-                            <button className="p-2 text-white/60 hover:text-white transition-colors">
-                                <SmileIcon className="w-6 h-6" />
-                            </button>
+                            <button onClick={handleSendMessage} className="bg-gray-500/50 w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 hover:bg-gray-400/50 transition-colors"><SendIcon className="w-5 h-5 text-white" /></button>
                         </div>
-
-                        {chatInput.trim() ? (
-                             <button 
-                                onClick={handleSendMessage} 
-                                className="w-10 h-10 rounded-full bg-[#3b82f6] flex items-center justify-center shadow-lg transition-transform active:scale-95 flex-shrink-0"
-                            >
-                                <ArrowUpIcon className="w-6 h-6 text-white" strokeWidth={2.5} />
-                             </button>
+                        <button onClick={(e) => { e.stopPropagation(); setGiftModalOpen(true); }} className="bg-black/40 w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 hover:bg-white/10 transition-all active:scale-90"><GiftIcon className="w-7 h-7 text-yellow-400 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]" /></button>
+                         {isBroadcaster ? (
+                            <button onClick={(e) => { e.stopPropagation(); setIsToolsOpen(true); }} className="bg-black/40 w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 hover:bg-white/10 transition-all active:scale-90"><MoreIcon className="w-7 h-7 text-white" /></button>
                         ) : (
-                            <>
-                                <button onClick={(e) => { e.stopPropagation(); setGiftModalOpen(true); }} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-transform active:scale-95">
-                                    <GiftIcon className="w-8 h-8 text-yellow-400 drop-shadow-md" />
-                                </button>
-                                 {isBroadcaster ? (
-                                    <button onClick={(e) => { e.stopPropagation(); setIsToolsOpen(true); }} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-transform active:scale-95">
-                                        <MoreIcon className="w-7 h-7 text-white drop-shadow-md" />
-                                    </button>
-                                ) : (
-                                    <button onClick={(e) => { e.stopPropagation(); onStartChatWithStreamer(streamerUser); }} className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-transform active:scale-95">
-                                        <MessageIcon className="w-7 h-7 text-white drop-shadow-md" />
-                                    </button>
-                                )}
-                            </>
+                            <button onClick={(e) => { e.stopPropagation(); onStartChatWithStreamer(streamerUser); }} className="bg-black/40 w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 hover:bg-white/10 transition-all active:scale-90"><MessageIcon className="w-7 h-7 text-white" /></button>
                         )}
                     </div>
                 </footer>
