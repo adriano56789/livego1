@@ -202,7 +202,7 @@ const MainScreen: React.FC<MainScreenProps> = ({
              </div>
          ) : (
              <div className="grid grid-cols-2 gap-1 px-1 pt-1 pb-20">
-                {streamers.map((streamer, index) => (
+                {Array.isArray(streamers) && streamers.map((streamer, index) => (
                     <div 
                       key={streamer.id} 
                       onClick={() => onSelectStream(streamer)}
